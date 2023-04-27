@@ -321,7 +321,6 @@ everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', '
 
 filepath = Path('C:/Users/randr/Desktop/wake_circular')
 
-#sidebranch
 
 '''
 
