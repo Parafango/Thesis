@@ -319,7 +319,9 @@ for i_d, der in enumerate(der_arr):
 
 everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', 'DD', 'offset', 'peak', 'yc_d', 'zc_d', 'sigma', 'Vm', 'e_max', 'e_mean', 'e_stdv', 'e_rel_max', 'e_rel_mean', 'e_rel_stdv', 'y_shape', 'z_shape'])
 
-filepath = Path('C:/Users/randr/Desktop/wake_circular ')
+filepath = Path('C:/Users/randr/Desktop/wake_circular')
+
+#sidebranch
 
 '''
 
