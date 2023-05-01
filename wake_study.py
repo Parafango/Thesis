@@ -169,7 +169,7 @@ def gauss_interp(Y_squared, Z_squared, y_c, href, U_squared):
 
     perr = np.sqrt(np.diag(pcov))  # calculate stdv errors on parameters A, offset, sigma
 
-    return popt, perr, r_arr, ws_arr
+    return popt, perr, R_flat, U_flat
 
 def gauss_interp_2d(Y_squared, Z_squared, y_c, href, U_squared):
     # in order to center the coordinates in the new reference system centered in yc, href
@@ -239,14 +239,13 @@ m_t = l_y * l_d * l_o
 m_y = l_d * l_o
 m_dd = l_o
 
-
+'''
 #--------------------------------------------circular wake--------------------------------------------------------------
 #definition of storing numpy matrix
 gauss_parameters = np.zeros((np.shape(der_arr)[0] * np.shape(Vm_arr)[0] * np.shape(TI_arr)[0] * np.shape(yaw_arr)[0] * np.shape(offset_arr)[0] * np.shape(DD_arr)[0], 19))
 
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------Loop begins over parameters---------------------------------------------------------
-
 
 start_time = time.time()
 for i_d, der in enumerate(der_arr):
@@ -290,7 +289,16 @@ for i_d, der in enumerate(der_arr):
 
                     U_new = flatten_wind_field(Z, U, alfa, Vm, href)
                     U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared(U_new, Y, Z)
-                    popt, perr, R_flat, U_flat = gauss_interp(Y_squared, Z_squared, y_c, z_c, U_squared)
+                    u_max = abs(np.amin(U_squared))
+
+                    if u_max<0.38:
+                        U_squared = np.multiply(U_squared, 0.38/u_max)
+                        popt, perr, R_flat, U_flat = gauss_interp(Y_squared, Z_squared, y_c, z_c, U_squared)
+                        popt[0] = popt[0] * u_max/0.38
+                        U_flat = np.divide(U_flat, 0.38/u_max)
+                    else:
+                        popt, perr, R_flat, U_flat = gauss_interp(Y_squared, Z_squared, y_c, z_c, U_squared)
+
                     z_shape = np.shape(U_squared)[0]
                     y_shape = np.shape(U_squared)[1]
 
@@ -319,7 +327,7 @@ for i_d, der in enumerate(der_arr):
 
 everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', 'DD', 'offset', 'peak', 'yc_d', 'zc_d', 'sigma', 'Vm', 'e_max', 'e_mean', 'e_stdv', 'e_rel_max', 'e_rel_mean', 'e_rel_stdv', 'y_shape', 'z_shape'])
 
-filepath = Path('C:/Users/randr/Desktop/wake_circular')
+filepath = Path('C:/Users/randr/Desktop/wake_circular.csv')
 
 
 '''
@@ -373,8 +381,17 @@ for i_d, der in enumerate(der_arr):
                     U = u_grid.reshape(n, n)
 
                     U_new = flatten_wind_field(Z, U, alfa, Vm, href)
-                    U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared_no_z0(U_new, Y, Z)
-                    popt, perr, yz_arr, u_arr = gauss_interp_2d(Y_squared, Z_squared, y_c, z_c, U_squared)
+                    U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared(U_new, Y, Z)
+                    u_max = abs(np.amin(U_squared))
+                    
+                    if u_max<0.38:
+                        U_squared = np.multiply(U_squared, 0.38/u_max)
+                        popt, perr, yz_arr, u_arr = gauss_interp_2d(Y_squared, Z_squared, y_c, z_c, U_squared)
+                        popt[0] = popt[0] * u_max/0.38
+                        u_arr = np.divide(u_arr, 0.38/u_max)
+                    else:    
+                        popt, perr, yz_arr, u_arr = gauss_interp_2d(Y_squared, Z_squared, y_c, z_c, U_squared)
+                        
                     z_shape = np.shape(U_squared)[0]
                     y_shape = np.shape(U_squared)[1]
 
@@ -407,8 +424,9 @@ for i_d, der in enumerate(der_arr):
 
 everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', 'DD', 'offset', 'peak', 'yc_d', 'zc_d', 'sigmay', 'sigmaz', 'Vm', 'e_max', 'e_mean', 'e_stdv', 'e_rel_max', 'e_rel_mean', 'e_rel_stdv', 'y_shape', 'z_shape'])
 
-filepath = Path('C:/Users/randr/Desktop/wake_elliptical_noz0')
-'''
+filepath = Path('C:/Users/randr/Desktop/wake_elliptical.csv')
+
+
 filepath.parent.mkdir(parents=True, exist_ok=True)
 everything.to_csv(filepath, index=False)
 
