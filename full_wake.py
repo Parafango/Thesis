@@ -22,7 +22,7 @@ solver_settings = {
 }
 
 Vm = 11
-DD = 5
+DD = 4.25
 der = 0
 TI = 0.02
 fi.reinitialize(solver_settings=solver_settings, reference_wind_height=href)
