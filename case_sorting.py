@@ -26,6 +26,7 @@ n_zc = 2
 n_yc = 5
 n_A = 5
 n_sigma = 5
+n_TI = 3
 
 start_time = time.time()
 if flag_V:
@@ -374,10 +375,11 @@ else:
     elif flag_shape == 'circ':
         Vm_bins = np.linspace(3, 15, 7, endpoint=True)
         if flag_spacing == 'lin':
-            sigma_bins = np.linspace(33.2, 89.93, n_sigma, endpoint=True)
-            zc_bins = np.linspace(120, 130, n_zc, endpoint=True)
-            yc_bins = np.linspace(-204, 199, n_yc, endpoint=True)
-            A_bins = np.linspace(0.31, 7.6, n_A, endpoint=True)
+            #TI_bins = np.linspace(0.085, 0.155, n_TI, endpoint=True)        #0.085-0.155
+            sigma_bins = np.linspace(0, 174.73, n_sigma, endpoint=True)     #0-174.73
+            zc_bins = np.linspace(123.42, 164.23, n_zc, endpoint=True)      #123.42-164.23
+            yc_bins = np.linspace(-149.29, 146.12, n_yc, endpoint=True)     #-149.29-146.12
+            A_bins = np.linspace(0, 3.16, n_A, endpoint=True)               #0-3.16
         elif flag_spacing == 'par':
             sigma_bins = get_par_spaced(33.2, 89.93, 5)
             zc_bins = np.linspace(120, 130, 3, endpoint=True)
@@ -386,21 +388,23 @@ else:
 
 
         dim_Vm = len(Vm_bins) - 1
+        #dim_TI = len(TI_bins) - 1
         dim_sigma = len(sigma_bins) - 1
         dim_zc = len(zc_bins) - 1
         dim_yc = len(yc_bins) - 1
         dim_A = len(A_bins) - 1
 
+
         cases = np.zeros((dim_Vm, dim_A, dim_yc, dim_zc, dim_sigma))
 
         if flag_noz0:
             df = pd.read_csv(
-                'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Gaussian wake/u/csv backup/new_Vm/wake_circular_noz0.csv')
+                'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Gaussian wake/csv backup/wake_circular_noz0.csv') #C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Gaussian wake/csv backup/wake_circular_noz0.csv
         else:
             df = pd.read_csv(
                 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Gaussian wake/u/csv backup/new_Vm/wake_circular.csv')
 
-        for i in range(0, 13125):
+        for i in range(0, 4375):
             A, yc, zc, sigma, Vm = df.iloc[i][6:11]
 
             if Vm == 15:
@@ -413,15 +417,17 @@ else:
             idx_yc = get_lower_bound_idx(yc_bins, yc)
             idx_zc = get_lower_bound_idx(zc_bins, zc)
             idx_sigma = get_lower_bound_idx(sigma_bins, sigma)
+            #idx_TI = get_lower_bound_idx(TI_bins, TI_add)
 
             cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma] = cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma] + 1
 
         cases_with_index = np.zeros((dim_Vm * dim_A * dim_yc * dim_zc * dim_sigma, 6))
 
-        m_Vm = dim_A * dim_yc * dim_zc * dim_sigma
-        m_A = dim_yc * dim_zc * dim_sigma
-        m_yc = dim_zc * dim_sigma
-        m_zc = dim_sigma
+        m_Vm = dim_A * dim_yc * dim_zc * dim_sigma #* dim_TI
+        m_A = dim_yc * dim_zc * dim_sigma #* dim_TI
+        m_yc = dim_zc * dim_sigma #* dim_TI
+        m_zc = dim_sigma #* dim_TI
+        #m_sigma = dim_TI
 
 
         for idx_Vm in range(0, dim_Vm):
@@ -429,6 +435,7 @@ else:
                 for idx_yc in range(0, dim_yc):
                     for idx_zc in range(0, dim_zc):
                         for idx_sigma in range(0, dim_sigma):
+                            #for idx_TI in range(0, dim_TI):
                             cases_with_index[
                             m_Vm * idx_Vm + m_A * idx_peak + m_yc * idx_yc + m_zc * idx_zc + idx_sigma, :] \
                                 = [idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma,
@@ -459,6 +466,7 @@ else:
             yc_arr = yc_bins[int(idx_yc):int(idx_yc) + 2]
             zc_arr = zc_bins[int(idx_zc):int(idx_zc) + 2]
             sigma_arr = sigma_bins[int(idx_sigma):int(idx_sigma) + 2]
+            #TI_arr = TI_bins[int(idx_TI):int(idx_TI) + 2]
             res = [[Vm, A, yc, zc, sigma] for Vm in Vm_arr for A in A_arr for yc in yc_arr for zc in zc_arr for
                    sigma in sigma_arr]
 
