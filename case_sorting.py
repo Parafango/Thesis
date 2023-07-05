@@ -460,7 +460,7 @@ else:
         simulations = np.zeros((occurrences_lim * 64, 6))
 
         for i in range(0, occurrences_lim):
-            idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma = pippaperino.iloc[i][0:6]
+            idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma, idx_TI = pippaperino.iloc[i][0:6]
             Vm_arr = Vm_bins[int(idx_Vm):int(idx_Vm) + 2]
             A_arr = A_bins[int(idx_peak):int(idx_peak) + 2]
             yc_arr = yc_bins[int(idx_yc):int(idx_yc) + 2]
