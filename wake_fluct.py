@@ -130,9 +130,11 @@ def get_U_squared_no_z0(U2s, Y, Z, fixed_grid=False, toll=1e-1):
 def gauss(x, a, b, c):
     return a * np.exp(-(x - b) ** 2.0 / (2 * c ** 2))
 
-def gauss_2d(xy,A,x0,y0,sigmax,sigmay):
+def gauss_2d(xy, A, x0, y0, sigmax, sigmay):
     return A * np.exp(-0.5*(((xy[0]-x0)/(sigmax)) ** 2.0 + ((xy[1]-y0)/(sigmay)) ** 2.0))
 
+def gauss_c(xy, A, x0, y0, sigma):
+    return A * np.exp(-0.5*(((xy[0]-x0)/(sigma)) ** 2.0 + ((xy[1]-y0)/(sigma)) ** 2.0))
 
 def gauss_interp(Y_squared, Z_squared, y_c, href, U_squared):
     # in order to center the coordinates in the new reference system centered in yc, href
@@ -186,6 +188,21 @@ def gauss_interp_2d(Y_squared, Z_squared, y_c, href, U_squared):
 
     return popt, perr, yz_arr, u_arr
 
+def gauss_interp_c(Y_squared, Z_squared, y_c, href, U_squared):
+    # in order to center the coordinates in the new reference system centered in yc, href
+    U_squared = np.abs(U_squared)
+    Z_centered = np.add(Z_squared, -href)
+    Y_centered = np.add(Y_squared, -y_c)
+
+    yz_arr = np.vstack((Y_centered.ravel(), Z_centered.ravel()))
+    u_arr = U_squared.ravel()
+
+    popt, pcov = curve_fit(gauss_c, yz_arr, u_arr)
+
+    perr = np.sqrt(np.diag(pcov))  # calculate stdv errors on parameters A, offset, sigma
+
+    return popt, perr, yz_arr, u_arr
+
 def get_field_slices(Y_squared, Z_squared, U_squared, yc, zc):
     dimz, dimy = np.shape(U_squared)
     y_arr = Y_squared[0, :]
@@ -200,7 +217,7 @@ def get_field_slices(Y_squared, Z_squared, U_squared, yc, zc):
 
 fi = FlorisInterface('Configurations/gch.yaml')
 fi.reinitialize(turbine_library_path='Configurations/turbine_library')
-fi.reinitialize(turbine_type=['Baseline_10MW_0'])
+fi.reinitialize(turbine_type=['Baseline_10MW_0.yaml'])
 
 #Definition of constants in code
 D = fi.floris.farm.rotor_diameters[0]
@@ -214,19 +231,20 @@ solver_settings = {
     "turbine_grid_points": 3
 }
 
-Vm = 11
+Vm = 3
 DD = 7
 der = 0
-TI = 0.02
+TI = 0.16 * (Vm * 0.75 + 5.6)/Vm
+print(TI)
 fi.reinitialize(solver_settings=solver_settings, reference_wind_height=href)
 fi.reinitialize(layout_x=layout_x, layout_y=layout_y)
 fi.reinitialize(wind_speeds=[Vm])
 fi.reinitialize(turbulence_intensity=TI)
 Vref = fi.floris.flow_field.wind_speeds[0]
 
-yaw_angle = 0
+yaw_angle = -25
 yaw_angles = np.zeros((1,1,1))
-yaw_angles[0,0,0] = yaw_angle
+yaw_angles[0,0,:] = yaw_angle
 
 
 cross_plane = fi.calculate_cross_plane(
@@ -240,31 +258,65 @@ df = cross_plane.df
 y_grid = np.array(df['x1'])
 z_grid = np.array(df['x2'])
 u_grid = np.array(df['u'])
+v_grid = np.array(df['v'])
+w_grid = np.array(df['w'])
+V_grid = np.array(np.sqrt(np.add(np.square(u_grid), np.square(v_grid), np.square(w_grid))))
+
+fi.calculate_wake(yaw_angles=yaw_angles)
+
+
 
 n = int(math.sqrt(u_grid.shape[0]))
 Y = y_grid.reshape(n, n)
 Z = z_grid.reshape(n, n)
-U = u_grid.reshape(n, n)
+U_mat = u_grid.reshape(n, n)
 
-U2s = flatten_wind_field(Z, U, alfa, Vref, href)
-U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared(U2s, Y, Z)
+U2s = flatten_wind_field(Z, U_mat, alfa, Vref, href)
+print(np.amin(U2s))
+print(U2s)
+U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared_no_z0(U2s, Y, Z)
+print(U_squared)
+fig, axes = plt.subplots(1,1, subplot_kw={"projection": "3d"})
 
+axes.title.set_text('Flattened')
+
+surf2 = axes.plot_surface(Y, Z, U_mat, cmap=cm.coolwarm,
+                             linewidth=0, antialiased = False)
+
+fig.colorbar(surf2)
+
+
+plt.show()
+'''
 u_max = abs(np.amin(U_squared))
-print(u_max)
+
 if u_max<0.38:
     U_squared = np.multiply(U_squared, 0.38/u_max)
 
 #circular gaussian
-popt_c, _, R_flat, U_flat = gauss_interp(Y_squared, Z_squared, y_c, z_c, U_squared)
+popt_c, _, yz_arr, U_flat = gauss_interp_c(Y_squared, Z_squared, y_c, z_c, U_squared)
 if u_max<0.38:
     popt_c[0] = popt_c[0] * u_max/0.38
     U_flat = np.multiply(U_flat, u_max/0.38)
-interp_c = np.array(gauss(R_flat, *popt_c))
+
+interp_c = np.array(gauss_c(yz_arr, *popt_c))
 dev = np.abs(np.add(interp_c, -abs(U_flat)))
+
+n_rows = np.shape(Z_squared)[0]
+n_cols = np.shape(Z_squared)[1]
+dev = dev.reshape(n_rows, n_cols)
 err_max_c = round(np.amax(dev), 3)
 err_mean_c = round(np.mean(dev), 3)
 
 
+plot = plt.pcolormesh(Y_squared, Z_squared, dev, shading='nearest')
+plt.colorbar(plot)
+plt.title('Deviations from simulated values [m/s]')
+plt.xlabel('y [m]')
+plt.ylabel('z [m]')
+plt.show()
+'''
+'''
 #ellittical gaussian
 popt_e, perr_e, yz_arr, u_arr = gauss_interp_2d(Y_squared, Z_squared, y_c, z_c, U_squared)
 if u_max<0.38:
@@ -273,6 +325,7 @@ if u_max<0.38:
 interp_e = np.array(gauss_2d(yz_arr, *popt_e))
 dev = np.abs(np.add(interp_e, -u_arr))
 err_max_e = round(np.amax(dev), 3)
+err_rel_max_e = round(err_max_e/(Vm/100), 3)
 err_mean_e = round(np.mean(dev), 3)
 
 
@@ -327,12 +380,21 @@ err_max_c_dx = round(np.amax(np.abs(np.add(interp_c_dx, u_dx))),3)
 err_max_c_u = round(np.amax(np.abs(np.add(interp_c_u, u_u))),3)
 err_max_c_d = round(np.amax(np.abs(np.add(interp_c_d, u_d))),3)
 
+
 err_max_e_0 = round(np.amax(np.abs(np.add(interp_e_0, u_0))),3)
 err_max_e_90 = round(np.amax(np.abs(np.add(interp_e_90, u_90))),3)
 err_max_e_sx = round(np.amax(np.abs(np.add(interp_e_sx, u_sx))),3)
 err_max_e_dx = round(np.amax(np.abs(np.add(interp_e_dx, u_dx))),3)
 err_max_e_u = round(np.amax(np.abs(np.add(interp_e_u, u_u))),3)
 err_max_e_d = round(np.amax(np.abs(np.add(interp_e_d, u_d))),3)
+
+#relative errors
+err_max_e_0 = round(np.amax(np.divide(np.abs(np.add(interp_e_0, u_0)), Vm/100)),3)
+err_max_e_90 = round(np.amax(np.divide(np.abs(np.add(interp_e_90, u_90)), Vm/100)),3)
+err_max_e_sx = round(np.amax(np.divide(np.abs(np.add(interp_e_sx, u_sx)), Vm/100)),3)
+err_max_e_dx = round(np.amax(np.divide(np.abs(np.add(interp_e_dx, u_dx)), Vm/100)),3)
+err_max_e_u = round(np.amax(np.divide(np.abs(np.add(interp_e_u, u_u)), Vm/100)),3)
+err_max_e_d = round(np.amax(np.divide(np.abs(np.add(interp_e_d, u_d)), Vm/100)),3)
 
 
 plt.plot(y_arr, abs(u_90), 'r', label='data')
@@ -342,7 +404,7 @@ plt.title('Horizontal cut through center with Vm={}, der={}, TI={}, DD={},\n yaw
 plt.xlabel('y [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Elliptical'
 figname = ('cut_90.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -357,7 +419,7 @@ plt.title('Horizontal cut at z = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}
 plt.xlabel('y [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Elliptical'
 figname = ('cut_u.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -367,11 +429,11 @@ plt.clf()
 plt.plot(y_arr, abs(u_d), 'r', label='data')
 plt.plot(y_arr, interp_e_d, 'b', label='interpolated elliptical values')
 plt.title('Horizontal cut at z = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}, err_max={}, err_cut={}'.format(round(z_d, 2), Vm, der, TI, DD, yaw_angle,
-                                                                                                                 err_max_e, err_max_e_d))
+                                                                                                                err_max_e, err_max_e_d))
 plt.xlabel('y [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Elliptical'
 figname = ('cut_d.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -380,14 +442,14 @@ plt.clf()
 
 plt.plot(z_arr, abs(u_0), 'r', label='data')
 plt.plot(z_arr, interp_e_0, 'b', label='interpolated elliptical values')
-plt.title('Vertical cut through center with Vm={}, der={}, TI={}, DD={},\n yaw={}, err_max={}, err_cut={}'.format(Vm, der, TI, DD, yaw_angle,
-                                                                                                                 err_max_e, err_max_e_0))
+plt.title('Vertical cut through center with Vm={}, der={}, TI={}, DD={},\n yaw={}, err_max={}, err_cut={}'.format(Vm, der, TI, DD, yaw_angle, err_max_e, err_max_e_0))
 plt.xlabel('z [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Elliptical'
 figname = ('cut_0.png')
 filepath = os.path.join(direct_path, figname)
+
 
 plt.savefig(filepath)
 plt.clf()
@@ -399,7 +461,7 @@ plt.title('Vertical cut at y = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}, 
 plt.xlabel('z [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Elliptical'
 figname = ('cut_sx.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -413,12 +475,13 @@ plt.title('Vertical cut at y = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}, 
 plt.xlabel('z [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Elliptical'
 figname = ('cut_dx.png')
 filepath = os.path.join(direct_path, figname)
 
 plt.savefig(filepath)
 plt.clf()
+'''
 '''
 #-----------------------circular-----------------------------------------------------
 plt.plot(y_arr, abs(u_90), 'r', label='data')
@@ -428,7 +491,7 @@ plt.title('Horizontal cut through center with Vm={}, der={}, TI={}, DD={},\n yaw
 plt.xlabel('y [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Circular'
 figname = ('cut_90.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -443,7 +506,7 @@ plt.title('Horizontal cut at z = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}
 plt.xlabel('y [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Circular'
 figname = ('cut_u.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -457,7 +520,7 @@ plt.title('Horizontal cut at z = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}
 plt.xlabel('y [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Circular'
 figname = ('cut_d.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -471,7 +534,7 @@ plt.title('Vertical cut through center with Vm={}, der={}, TI={}, DD={},\n yaw={
 plt.xlabel('z [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Circular'
 figname = ('cut_0.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -485,7 +548,7 @@ plt.title('Vertical cut at y = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}, 
 plt.xlabel('z [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Circular'
 figname = ('cut_sx.png')
 filepath = os.path.join(direct_path, figname)
 
@@ -499,7 +562,7 @@ plt.title('Vertical cut at y = {} m with Vm={}, der={}, TI={}, DD={},\n yaw={}, 
 plt.xlabel('z [m]')
 plt.ylabel('wake deficit [m/s]')
 plt.legend()
-direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/noz0/Circular prova'
+direct_path = 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Reports/slices plot/V/Circular'
 figname = ('cut_dx.png')
 filepath = os.path.join(direct_path, figname)
 

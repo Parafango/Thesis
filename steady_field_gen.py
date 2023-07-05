@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import random
 
 def gauss(x, a, b, c):
     return a * np.exp(-(x - b) ** 2.0 / (2 * c ** 2))
@@ -10,8 +11,8 @@ def gauss(x, a, b, c):
 grid_height = 185
 grid_width = 185
 hub_height = 119
-n_rows = 10
-n_cols = 10
+n_rows = 5
+n_cols = 5
 Vm = 13
 shear_exp = 0.12
 a = 3
@@ -48,12 +49,16 @@ time_series_file.write('Elapsed Time\t')
 
 for i in range(0, n_rows):
     for j in range(0, n_cols):
-        time_series_file.write('Point{:03d}u\t'.format(i * 10 + j + 1))
+        time_series_file.write('Point{:03d}u\t'.format(i * 5 + j + 1))
+        time_series_file.write('Point{:03d}v\t'.format(i * 5 + j + 1))
+        time_series_file.write('Point{:03d}w\t'.format(i * 5 + j + 1))
 
 time_series_file.write('\n')
-time_series_file.write('(s)\t\t')
+time_series_file.write('\t(s)\t\t')
 for i in range(0, n_rows):
     for j in range(0, n_cols):
+        time_series_file.write('(m/s)\t\t')
+        time_series_file.write('(m/s)\t\t')
         time_series_file.write('(m/s)\t\t')
 
 time_series_file.write('\n')
@@ -63,12 +68,14 @@ dt = 0.05
 tf = 600
 t_len = int(tf / dt + 1)
 
-for i in range(0, t_len):
-    t = t0 + i * dt
-    time_series_file.write('{:.3f}\t\t'.format(t))
+for l in range(0, t_len):
+    t = t0 + l * dt
+    time_series_file.write('\t{:.4f}\t\t'.format(t))
     for i in range(0, n_rows):
         for j in range(0, n_cols):
-            time_series_file.write('{}\t\t'.format(np.round(U[i, j], 3)))
+            time_series_file.write('{:.4f}\t\t'.format(U[i, j])) #+ random.gauss(0, 0.1 * Vm)))
+            time_series_file.write('0.0000\t\t')
+            time_series_file.write('0.0000\t\t')
 
     time_series_file.write('\n')
 

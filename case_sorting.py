@@ -16,10 +16,10 @@ def get_par_spaced(a, b, arr_len):
     return bins
 
 
-flag_shape = 'ell' #'ell' o 'circ'
+flag_shape = 'circ' #'ell' o 'circ'
 flag_spacing = 'lin' #'lin' o 'par'
 flag_noz0 = True
-flag_V = True
+flag_V = False
 n_sigmay = 5        #n° of values, NOT bins (bins=N-1)
 n_sigmaz = 5
 n_zc = 2

@@ -22,9 +22,9 @@ solver_settings = {
 }
 
 Vm = 11
-DD = 4.25
+DD = 5
 der = 0
-TI = 0.02
+TI = 0.1
 fi.reinitialize(solver_settings=solver_settings, reference_wind_height=href)
 fi.reinitialize(layout_x=layout_x, layout_y=layout_y)
 fi.reinitialize(wind_speeds=[Vm])
@@ -61,11 +61,11 @@ V_mat = V_grid.reshape(n, n)
 
 fig = plt.figure(figsize=plt.figaspect(0.5))
 ax = fig.add_subplot(1,2,1, projection = '3d')
-surf = ax.plot_surface(Y_mat, Z_mat, u_mat, cmap=cm.coolwarm,
+surf = ax.plot_surface(Y_mat, Z_mat, v_mat, cmap=cm.coolwarm,
                        linewidth=0, antialiased=False)
 fig.colorbar(surf)
 
-ax.title.set_text('u field')
+ax.title.set_text('v field')
 
 ax = fig.add_subplot(1,2,2, projection = '3d')
 ax.title.set_text('v field')
@@ -87,9 +87,9 @@ surf3 = ax.plot_surface(Y_mat, Z_mat, w_mat, cmap=cm.coolwarm,
 fig.colorbar(surf3)
 
 ax = fig.add_subplot(1,2,2, projection = '3d')
-ax.title.set_text('V field')
+ax.title.set_text('w field')
 
-surf4 = ax.plot_surface(Y_mat, Z_mat, V_mat, cmap=cm.coolwarm,
+surf4 = ax.plot_surface(Y_mat, Z_mat, w_mat, cmap=cm.coolwarm,
                              linewidth=0, antialiased = False)
 
 fig.colorbar(surf4)

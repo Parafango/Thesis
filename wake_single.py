@@ -96,6 +96,56 @@ def get_U_squared(U2s, Y, Z):
 
     return U_squared, Y_squared, Z_squared, y_c, z_c
 
+def get_U_squared_no_z0(U2s, Y, Z, fixed_grid=False, toll=1e-1):
+    u_min = np.amin(U2s)
+    idx_min = [U2s == u_min]
+    y_c = Y[idx_min[0]]
+    z_c = Z[idx_min[0]]
+    z_arr = Z[:, 0]
+    y_arr = Y[0, :]
+
+    if fixed_grid:
+        #create a 65x50 grid centered in yc, zc
+        z_squared = z_arr[0:50]
+        idx_yc = np.where(y_arr == y_c)[0][0]
+        y_squared = y_arr[idx_yc-32:idx_yc+33]
+        U_squared = U2s[0:50, idx_yc-32:idx_yc+33]
+
+    else:
+        idx_rect = [U2s <= -toll]
+        y_rect = np.unique(Y[idx_rect[0]])
+        z_rect = np.unique(Z[idx_rect[0]])
+        ymin = y_rect[0]
+        ymax = y_rect[-1]
+        zmin = z_rect[1]
+        zmax = z_rect[-1]
+
+        # impose symmetry with respect to center of the wake (yc !=0 generally)
+        if abs(ymin - y_c) > (ymax - y_c):
+            ry = abs(ymin - y_c)
+        else:
+            ry = abs(ymax - y_c)
+
+
+        if abs(zmin - z_c) > (zmax - z_c):
+            rz = abs(zmin - z_c)
+        else:
+            rz = abs(zmax - z_c)
+
+        imin = np.where(abs(y_arr - (y_c - ry)) < 1e-4)[0]
+        imax = np.where(abs(y_arr - (y_c + ry)) < 1e-4)[0]
+        jmin = [1] #always start from z>0
+        jmax = np.where(abs(z_arr - (z_c + rz)) < 1e-4)[0]
+
+        U_squared = U2s[jmin[0]:(jmax[0] + 1), imin[0]:(imax[0] + 1)]
+
+        y_squared = y_arr[imin[0]:imax[0] + 1]
+        z_squared = z_arr[jmin[0]:jmax[0] + 1]
+
+    Y_squared, Z_squared = np.meshgrid(y_squared, z_squared)
+
+    return U_squared, Y_squared, Z_squared, y_c, z_c
+
 def gauss(x, a, b, c):
     return a * np.exp(-(x - b) ** 2.0 / (2 * c ** 2))
 
@@ -235,7 +285,7 @@ for i_y, yaw_angle in enumerate(yaw_arr):
 
 
 everything = pd.DataFrame(gauss_parameters, columns=['yaw', 'distance', 'imp', 'peak', 'yc', 'sigma', 'Vm', 'e_max', 'e_mean', 'e_stdv'])
-print(everything)
+
 
 end_time = time.time()
 time_elapsed = end_time-start_time
