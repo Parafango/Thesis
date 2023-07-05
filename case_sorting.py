@@ -375,7 +375,7 @@ else:
     elif flag_shape == 'circ':
         Vm_bins = np.linspace(3, 15, 7, endpoint=True)
         if flag_spacing == 'lin':
-            #TI_bins = np.linspace(0.085, 0.155, n_TI, endpoint=True)        #0.085-0.155
+            TI_bins = np.linspace(0.085, 0.155, n_TI, endpoint=True)        #0.085-0.155
             sigma_bins = np.linspace(0, 174.73, n_sigma, endpoint=True)     #0-174.73
             zc_bins = np.linspace(123.42, 164.23, n_zc, endpoint=True)      #123.42-164.23
             yc_bins = np.linspace(-149.29, 146.12, n_yc, endpoint=True)     #-149.29-146.12
@@ -388,14 +388,14 @@ else:
 
 
         dim_Vm = len(Vm_bins) - 1
-        #dim_TI = len(TI_bins) - 1
+        dim_TI = len(TI_bins) - 1
         dim_sigma = len(sigma_bins) - 1
         dim_zc = len(zc_bins) - 1
         dim_yc = len(yc_bins) - 1
         dim_A = len(A_bins) - 1
 
 
-        cases = np.zeros((dim_Vm, dim_A, dim_yc, dim_zc, dim_sigma))
+        cases = np.zeros((dim_Vm, dim_A, dim_yc, dim_zc, dim_sigma, dim_TI))
 
         if flag_noz0:
             df = pd.read_csv(
@@ -405,7 +405,7 @@ else:
                 'C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Gaussian wake/u/csv backup/new_Vm/wake_circular.csv')
 
         for i in range(0, 4375):
-            A, yc, zc, sigma, Vm = df.iloc[i][6:11]
+            A, yc, zc, sigma, Vm, TI_add = df.iloc[i][6:12]
 
             if Vm == 15:
                 idx_Vm = get_lower_bound_idx(Vm_bins,
@@ -417,17 +417,17 @@ else:
             idx_yc = get_lower_bound_idx(yc_bins, yc)
             idx_zc = get_lower_bound_idx(zc_bins, zc)
             idx_sigma = get_lower_bound_idx(sigma_bins, sigma)
-            #idx_TI = get_lower_bound_idx(TI_bins, TI_add)
+            idx_TI = get_lower_bound_idx(TI_bins, TI_add)
 
-            cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma] = cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma] + 1
+            cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma, idx_TI] = cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma, idx_TI] + 1
 
-        cases_with_index = np.zeros((dim_Vm * dim_A * dim_yc * dim_zc * dim_sigma, 6))
+        cases_with_index = np.zeros((dim_Vm * dim_A * dim_yc * dim_zc * dim_sigma * dim_TI, 7))
 
-        m_Vm = dim_A * dim_yc * dim_zc * dim_sigma #* dim_TI
-        m_A = dim_yc * dim_zc * dim_sigma #* dim_TI
-        m_yc = dim_zc * dim_sigma #* dim_TI
-        m_zc = dim_sigma #* dim_TI
-        #m_sigma = dim_TI
+        m_Vm = dim_A * dim_yc * dim_zc * dim_sigma * dim_TI
+        m_A = dim_yc * dim_zc * dim_sigma * dim_TI
+        m_yc = dim_zc * dim_sigma * dim_TI
+        m_zc = dim_sigma * dim_TI
+        m_sigma = dim_TI
 
 
         for idx_Vm in range(0, dim_Vm):
@@ -435,14 +435,14 @@ else:
                 for idx_yc in range(0, dim_yc):
                     for idx_zc in range(0, dim_zc):
                         for idx_sigma in range(0, dim_sigma):
-                            #for idx_TI in range(0, dim_TI):
-                            cases_with_index[
-                            m_Vm * idx_Vm + m_A * idx_peak + m_yc * idx_yc + m_zc * idx_zc + idx_sigma, :] \
-                                = [idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma,
-                                                cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma]]
+                            for idx_TI in range(0, dim_TI):
+                                cases_with_index[
+                                m_Vm * idx_Vm + m_A * idx_peak + m_yc * idx_yc + m_zc * idx_zc + m_sigma * idx_sigma + idx_TI, :] \
+                                    = [idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma, idx_TI,
+                                                    cases[idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma, idx_TI]]
 
         pippaperino = pd.DataFrame(cases_with_index,
-                                   columns=['idx_Vm', 'idx_peak', 'idx_yc', 'idx_zc', 'idx_sigma',
+                                   columns=['idx_Vm', 'idx_peak', 'idx_yc', 'idx_zc', 'idx_sigma', 'idx_TI',
                                             'occurrences'])
         pippaperino.sort_values(by=['occurrences'], ascending=False, inplace=True)
 
@@ -457,23 +457,23 @@ else:
         occurrences_lim = np.amin(np.where(pippaperino['occurrences'] == 0))
 
         # pippaperino = pd.read_csv('C:/Users/randr/OneDrive - Politecnico di Milano/Tesi/Gaussian wake/Binning/noz0/sorted_binned_elliptical_noz0.csv')
-        simulations = np.zeros((occurrences_lim * 32, 5))
+        simulations = np.zeros((occurrences_lim * 64, 6))
 
         for i in range(0, occurrences_lim):
-            idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma = pippaperino.iloc[i][0:5]
+            idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma = pippaperino.iloc[i][0:6]
             Vm_arr = Vm_bins[int(idx_Vm):int(idx_Vm) + 2]
             A_arr = A_bins[int(idx_peak):int(idx_peak) + 2]
             yc_arr = yc_bins[int(idx_yc):int(idx_yc) + 2]
             zc_arr = zc_bins[int(idx_zc):int(idx_zc) + 2]
             sigma_arr = sigma_bins[int(idx_sigma):int(idx_sigma) + 2]
-            #TI_arr = TI_bins[int(idx_TI):int(idx_TI) + 2]
-            res = [[Vm, A, yc, zc, sigma] for Vm in Vm_arr for A in A_arr for yc in yc_arr for zc in zc_arr for
-                   sigma in sigma_arr]
+            TI_arr = TI_bins[int(idx_TI):int(idx_TI) + 2]
+            res = [[Vm, A, yc, zc, sigma, TI] for Vm in Vm_arr for A in A_arr for yc in yc_arr for zc in zc_arr for
+                   sigma in sigma_arr for TI in TI_arr]
 
-            for j in range(0, 32):
-                simulations[i * 32 + j, :] = res[j]
+            for j in range(0, 64):
+                simulations[i * 64 + j, :] = res[j]
 
-        plutopino = pd.DataFrame(simulations, columns=['Vm', 'A', 'yc', 'zc', 'sigma'])
+        plutopino = pd.DataFrame(simulations, columns=['Vm', 'A', 'yc', 'zc', 'sigma', 'TI_add'])
         plutopino.drop_duplicates(keep='first', inplace=True)
 
         if flag_noz0:
