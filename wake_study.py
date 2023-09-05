@@ -247,7 +247,7 @@ fi.reinitialize(layout_x=layout_x, layout_y=layout_y)
 
 #parameters for which the field must be calculated
 offset_arr = np.array([-0.5, -0.25, 0, 0.25, 0.5])
-DD_arr = np.array([3, 4, 5, 6, 7])
+DD_arr = np.array([5]) #np.array([3, 4, 5, 6, 7])
 #TI_arr = np.array([0.02, 0.06, 0.1])
 yaw_arr = np.array([-25, -15, 0, 15, 25])
 Vm_arr = np.array([3, 5, 7, 9, 11, 13, 15])
@@ -268,7 +268,7 @@ m_dd = l_o
 k = 0.5 #tian-song coefficient
 #--------------------------------------------circular wake--------------------------------------------------------------
 #definition of storing numpy matrix
-gauss_parameters = np.zeros((np.shape(der_arr)[0] * np.shape(Vm_arr)[0] * np.shape(yaw_arr)[0] * np.shape(offset_arr)[0] * np.shape(DD_arr)[0], 20))
+gauss_parameters = np.zeros((np.shape(der_arr)[0] * np.shape(Vm_arr)[0] * np.shape(yaw_arr)[0] * np.shape(offset_arr)[0] * np.shape(DD_arr)[0], 23))
 
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------Loop begins over parameters---------------------------------------------------------
@@ -303,7 +303,21 @@ for i_d, der in enumerate(der_arr):
                     yaw_angles=yaw_angles
                 )
 
-                TI_add = round((k / 2) * CT ** (k / 4) * TI_amb ** (-k / 8) * dd ** (-k), 3)
+                m = 1 / np.sqrt(1 - CT)
+                r0 = D/2 * np.sqrt((1 + m) / 2)
+                drdx_amb = 2.5 * TI_amb + 0.005
+                drdx_sh = (1 - m) * np.sqrt(1.49 + m) / (9.76 * (1 + m))
+                drdx_mech = 0.012 * 3 * 8
+                drdx = np.sqrt(drdx_amb ** 2 + drdx_sh ** 2 + drdx_mech ** 2)
+                Xn = (np.sqrt(0.214 + 0.144 * m) * (1 - np.sqrt(0.134 + 0.124 * m))) / \
+                     ((1 - np.sqrt(0.214 + 0.144 * m)) * (np.sqrt(0.134 + 0.124 * m))) * r0 / drdx
+
+                TI_QA = round((4.8 * CT ** (0.7) * (TI_amb * 100) ** (0.68) * (dd * D / Xn) ** (-0.57))/100, 3)
+                TI_TS = round((k / 2) * CT ** (k / 4) * TI_amb ** (-k / 8) * dd ** (-k), 3)
+                d = 2.3 * CT ** (- 1.2)
+                e = TI_amb ** (0.1)
+                f = 0.7 * CT ** (-3.2) * TI_amb ** (-0.45)
+                TI_ish = round(1/(d + e * dd + f * (1 + dd) ** (-2.0)), 3)
 
                 df = cross_plane.df
                 y_grid = np.array(df['x1'])
@@ -322,12 +336,21 @@ for i_d, der in enumerate(der_arr):
                     y_gc = 0
                     z_gc = 0
                     err_max = np.amin(abs(U_new))
-                    err_mean = round(np.mean(dev), 3)
-                    stdv = round(np.std(dev), 3)
-                    dev_rel = np.divide(dev, Vm / 100)
-                    err_rel_max = round(np.amax(dev_rel), 3)
-                    err_rel_mean = round(np.mean(dev_rel), 3)
-                    stdv_rel = round(np.std(dev_rel), 3)
+                    if 'dev' in locals():
+                        err_mean = round(np.mean(dev), 3)
+                        stdv = round(np.std(dev), 3)
+                        dev_rel = np.divide(dev, Vm / 100)
+                        err_rel_max = round(np.amax(dev_rel), 3)
+                        err_rel_mean = round(np.mean(dev_rel), 3)
+                        stdv_rel = round(np.std(dev_rel), 3)
+                    else:
+                        err_mean = 0
+                        stdv = 0
+                        dev_rel = 0
+                        err_rel_mean = 0
+                        err_rel_max = 0
+                        stdv_rel = 0
+
                     y_shape = 0
                     z_shape = 0
                 else:
@@ -366,14 +389,14 @@ for i_d, der in enumerate(der_arr):
                 for i_o, offset in enumerate(offset_arr):
                     y_c_d = round(y_c[0] + y_gc - offset * D, 3)
                     z_c_d = round(z_c[0] + z_gc, 3)
-                    popti = np.array([der, Vm, TI_amb, yaw_angle, dd, offset, A, y_c_d, z_c_d, sigma, Vm, TI_add, err_max, err_mean,
-                                      stdv, err_rel_max, err_rel_mean, stdv_rel, y_shape, z_shape])
+                    popti = np.array([der, Vm, TI_amb, yaw_angle, dd, offset, A, y_c_d, z_c_d, sigma, Vm, TI_QA, TI_ish, TI_TS, err_max, err_mean,
+                                      stdv, err_rel_max, err_rel_mean, stdv_rel, y_shape, z_shape, CT])
                     gauss_parameters[i_d * m_d + i_v * m_v + i_y * m_y + i_dd * m_dd + i_o, :] = popti
 
 
-everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', 'DD', 'offset', 'peak', 'yc_d', 'zc_d', 'sigma', 'Vm', 'TI_add', 'e_max', 'e_mean', 'e_stdv', 'e_rel_max', 'e_rel_mean', 'e_rel_stdv', 'y_shape', 'z_shape'])
+everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', 'DD', 'offset', 'peak', 'yc_d', 'zc_d', 'sigma', 'Vm', 'TI_QA', 'TI_ish', 'TI_TS', 'e_max', 'e_mean', 'e_stdv', 'e_rel_max', 'e_rel_mean', 'e_rel_stdv', 'y_shape', 'z_shape', 'CT'])
 
-filepath = Path('C:/Users/randr/Desktop/wake_circular_noz0.csv')
+filepath = Path('C:/Users/randr/Desktop/wake_5D.csv')
 
 
 '''

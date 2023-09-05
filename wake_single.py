@@ -65,7 +65,7 @@ def get_U_squared(U2s, Y, Z):
 
     limits = [[ymin, ymax], [zmin, zmax]]
 
-    n = U.shape[0]  # let's assume n is odd for now
+    n = U2s.shape[0]  # let's assume n is odd for now
 
     u_min = np.amin(U2s)
 
@@ -149,6 +149,9 @@ def get_U_squared_no_z0(U2s, Y, Z, fixed_grid=False, toll=1e-1):
 def gauss(x, a, b, c):
     return a * np.exp(-(x - b) ** 2.0 / (2 * c ** 2))
 
+def gauss_c(xy, A, x0, y0, sigma):
+    return A * np.exp(-0.5*(((xy[0]-x0)/(sigma)) ** 2.0 + ((xy[1]-y0)/(sigma)) ** 2.0))
+
 
 def gauss_interp(Y_squared, Z_squared, y_c, href, U_squared):
     # in order to center the coordinates in the new reference system centered in yc, href
@@ -187,6 +190,21 @@ def gauss_interp(Y_squared, Z_squared, y_c, href, U_squared):
 
     return popt, perr, r_arr, ws_arr
 
+def gauss_interp_c(Y_squared, Z_squared, y_c, href, U_squared):
+    # in order to center the coordinates in the new reference system centered in yc, href
+    U_squared = np.abs(U_squared)
+    Z_centered = np.add(Z_squared, -href)
+    Y_centered = np.add(Y_squared, -y_c)
+
+    yz_arr = np.vstack((Y_centered.ravel(), Z_centered.ravel()))
+    u_arr = U_squared.ravel()
+
+    popt, pcov = curve_fit(gauss_c, yz_arr, u_arr)
+
+    perr = np.sqrt(np.diag(pcov))  # calculate stdv errors on parameters A, offset, sigma
+
+    return popt, perr, yz_arr, u_arr
+
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------Farm and parameters definition------------------------------------------------------
 
@@ -198,8 +216,8 @@ fi.reinitialize(turbine_type=['Baseline_10MW_0.yaml'])
 D = fi.floris.farm.rotor_diameters[0]
 href = fi.floris.farm.hub_heights[0]
 alfa = fi.floris.flow_field.wind_shear
-layout_x = [0.]
-layout_y = [0.]
+layout_x = [0., 7 * D]
+layout_y = [0., 0.]
 
 solver_settings = {
     "type": "turbine_grid",
@@ -238,6 +256,34 @@ fi.reinitialize(turbine_type = [turbine_name])
 
 Vref = fi.floris.flow_field.wind_speeds[0]
 
+yaw_angles = np.zeros((1, 1, 2))
+yaw_angles[0, 0, 0] = 25
+fi.calculate_wake(yaw_angles=yaw_angles)
+
+cross_plane = fi.calculate_cross_plane(
+    y_resolution=51,
+    z_resolution=51,
+    downstream_dist=5 * D,
+    yaw_angles=yaw_angles
+)
+
+df = cross_plane.df
+y_grid = np.array(df['x1'])
+z_grid = np.array(df['x2'])
+u_grid = np.array(df['u'])
+
+n = int(math.sqrt(u_grid.shape[0]))
+Y = y_grid.reshape(n, n)
+Z = z_grid.reshape(n, n)
+U = u_grid.reshape(n, n)
+
+U_new = flatten_wind_field(Z, U, alfa, Vref, href)
+U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared_no_z0(U_new, Y, Z)
+popt, perr, yz_arr, u_arr = gauss_interp_c(Y_squared, Z_squared, y_c, z_c, U_squared)
+
+print(popt)
+
+'''
 start_time = time.time()
 
 for i_y, yaw_angle in enumerate(yaw_arr):
@@ -293,7 +339,7 @@ time_elapsed = end_time-start_time
 print(f'Process took {time_elapsed} seconds')
 
 print('-----------------------------------------------------------------------------------------------------------------')
-
+'''
 
 
 
