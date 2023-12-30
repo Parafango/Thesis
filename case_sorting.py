@@ -22,11 +22,10 @@ flag_noz0 = True
 flag_V = False
 n_sigmay = 5        #n° of values, NOT bins (bins=N-1)
 n_sigmaz = 5
-n_zc = 3
-n_yc = 8
-n_A = 8
-n_sigma = 8
-#n_TI = 3
+n_zc = 4
+n_yc = 11
+n_A = 11
+n_sigma = 11
 
 start_time = time.time()
 if flag_V:
@@ -376,7 +375,7 @@ else:
         Vm_bins = np.linspace(3, 15, 7, endpoint=True)
         if flag_spacing == 'lin':
             #TI_bins = np.linspace(0.085, 0.155, n_TI, endpoint=True)       #0.085-0.155
-            sigma_bins = np.asarray([0, 86.5, 107.98, 129.45, 150.93])      #sigma_bins = np.linspace(0, 174.73, n_sigma, endpoint=True)     #0-174.73
+            sigma_bins = np.concatenate(([0], np.linspace(86.5, 150.93, n_sigma-1, endpoint=True)))      #sigma_bins = np.linspace(0, 174.73, n_sigma, endpoint=True)     #0-174.73
             zc_bins = np.linspace(127.96, 149.18, n_zc, endpoint=True)      #123.42-164.23
             yc_bins = np.linspace(-142.83, 140.67, n_yc, endpoint=True)     #-148.3-146.12
             A_bins = np.linspace(0, 1.553, n_A, endpoint=True)              #0-3.16
@@ -448,18 +447,28 @@ else:
         simulations = np.zeros((occurrences_lim * 32, 5))
 
         for i in range(0, occurrences_lim):
+            flag_sigma = 0
             idx_Vm, idx_peak, idx_yc, idx_zc, idx_sigma = cases_with_binning.iloc[i][0:5]
+            if idx_sigma == 0:
+                sigma_arr = [sigma_bins[0]]
+                flag_sigma = 1
+            else:
+                sigma_arr = sigma_bins[int(idx_sigma):int(idx_sigma) + 2]
+
             Vm_arr = Vm_bins[int(idx_Vm):int(idx_Vm) + 2]
             A_arr = A_bins[int(idx_peak):int(idx_peak) + 2]
             yc_arr = yc_bins[int(idx_yc):int(idx_yc) + 2]
             zc_arr = zc_bins[int(idx_zc):int(idx_zc) + 2]
-            sigma_arr = sigma_bins[int(idx_sigma):int(idx_sigma) + 2]
             #TI_arr = TI_bins[int(idx_TI):int(idx_TI) + 2]
+
             res = [[Vm, A, yc, zc, sigma] for Vm in Vm_arr for A in A_arr for yc in yc_arr for zc in zc_arr for
                    sigma in sigma_arr]
-
-            for j in range(0, 32):
-                simulations[i * 32 + j, :] = res[j]
+            if flag_sigma:
+                for j in range(0, 16):
+                    simulations[i * 32 + j, :] = res[j]
+            else:
+                for j in range(0, 32):
+                    simulations[i * 32 + j, :] = res[j]
 
         cases_with_interp = pd.DataFrame(simulations, columns=['Vm', 'A', 'yc', 'zc', 'sigma'])
         cases_with_interp.drop_duplicates(keep='first', inplace=True)

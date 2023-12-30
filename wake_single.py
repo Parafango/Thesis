@@ -103,6 +103,7 @@ def get_U_squared_no_z0(U2s, Y, Z, fixed_grid=False, toll=1e-1):
     z_c = Z[idx_min[0]]
     z_arr = Z[:, 0]
     y_arr = Y[0, :]
+    flag_no_deficit = 0
 
     if fixed_grid:
         #create a 65x50 grid centered in yc, zc
@@ -115,36 +116,43 @@ def get_U_squared_no_z0(U2s, Y, Z, fixed_grid=False, toll=1e-1):
         idx_rect = [U2s <= -toll]
         y_rect = np.unique(Y[idx_rect[0]])
         z_rect = np.unique(Z[idx_rect[0]])
-        ymin = y_rect[0]
-        ymax = y_rect[-1]
-        zmin = z_rect[1]
-        zmax = z_rect[-1]
-
-        # impose symmetry with respect to center of the wake (yc !=0 generally)
-        if abs(ymin - y_c) > (ymax - y_c):
-            ry = abs(ymin - y_c)
+        if len(y_rect) == 0 or len(z_rect) == 0:
+            flag_no_deficit = 1
+            U_squared = []
+            Y_squared = []
+            Z_squared = []
+            return U_squared, Y_squared, Z_squared, y_c, z_c, flag_no_deficit
         else:
-            ry = abs(ymax - y_c)
+            ymin = y_rect[0]
+            ymax = y_rect[-1]
+            zmin = z_rect[1]
+            zmax = z_rect[-1]
+
+            # impose symmetry with respect to center of the wake (yc !=0 generally)
+            if abs(ymin - y_c) > (ymax - y_c):
+                ry = abs(ymin - y_c)
+            else:
+                ry = abs(ymax - y_c)
 
 
-        if abs(zmin - z_c) > (zmax - z_c):
-            rz = abs(zmin - z_c)
-        else:
-            rz = abs(zmax - z_c)
+            if abs(zmin - z_c) > (zmax - z_c):
+                rz = abs(zmin - z_c)
+            else:
+                rz = abs(zmax - z_c)
 
-        imin = np.where(abs(y_arr - (y_c - ry)) < 1e-4)[0]
-        imax = np.where(abs(y_arr - (y_c + ry)) < 1e-4)[0]
-        jmin = [1] #always start from z>0
-        jmax = np.where(abs(z_arr - (z_c + rz)) < 1e-4)[0]
+            imin = np.where(abs(y_arr - (y_c - ry)) < 1e-4)[0]
+            imax = np.where(abs(y_arr - (y_c + ry)) < 1e-4)[0]
+            jmin = [1] #always start from z>0
+            jmax = np.where(abs(z_arr - (z_c + rz)) < 1e-4)[0]
 
-        U_squared = U2s[jmin[0]:(jmax[0] + 1), imin[0]:(imax[0] + 1)]
+            U_squared = U2s[jmin[0]:(jmax[0] + 1), imin[0]:(imax[0] + 1)]
 
-        y_squared = y_arr[imin[0]:imax[0] + 1]
-        z_squared = z_arr[jmin[0]:jmax[0] + 1]
+            y_squared = y_arr[imin[0]:imax[0] + 1]
+            z_squared = z_arr[jmin[0]:jmax[0] + 1]
 
     Y_squared, Z_squared = np.meshgrid(y_squared, z_squared)
 
-    return U_squared, Y_squared, Z_squared, y_c, z_c
+    return U_squared, Y_squared, Z_squared, y_c, z_c, flag_no_deficit
 
 def gauss(x, a, b, c):
     return a * np.exp(-(x - b) ** 2.0 / (2 * c ** 2))
@@ -216,7 +224,7 @@ fi.reinitialize(turbine_type=['Baseline_10MW_0.yaml'])
 D = fi.floris.farm.rotor_diameters[0]
 href = fi.floris.farm.hub_heights[0]
 alfa = fi.floris.flow_field.wind_shear
-layout_x = [0., 7 * D]
+layout_x = [0., 5 * D]
 layout_y = [0., 0.]
 
 solver_settings = {
@@ -244,8 +252,8 @@ gauss_parameters = np.zeros((np.shape(yaw_arr)[0] * np.shape(offset_arr)[0] * np
 
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------Loop begins over parameters---------------------------------------------------------
-fi.reinitialize(wind_speeds = [Vm_arr[0]])
-fi.reinitialize(turbulence_intensity = TI_arr[0])
+fi.reinitialize(wind_speeds = [11])
+fi.reinitialize(turbulence_intensity = 0.201)
 
 der = int(der_arr[0])
 der = str(der)
@@ -257,12 +265,12 @@ fi.reinitialize(turbine_type = [turbine_name])
 Vref = fi.floris.flow_field.wind_speeds[0]
 
 yaw_angles = np.zeros((1, 1, 2))
-yaw_angles[0, 0, 0] = 25
+yaw_angles[0, 0, 0] = 0
 fi.calculate_wake(yaw_angles=yaw_angles)
 
 cross_plane = fi.calculate_cross_plane(
-    y_resolution=51,
-    z_resolution=51,
+    y_resolution=101,
+    z_resolution=101,
     downstream_dist=5 * D,
     yaw_angles=yaw_angles
 )
@@ -277,11 +285,49 @@ Y = y_grid.reshape(n, n)
 Z = z_grid.reshape(n, n)
 U = u_grid.reshape(n, n)
 
+print(Y)
+print(Z)
+
+z_arr = Z[:,0]
+zlen = sum(z_arr<400)
+print(zlen)
+Y = Y[0:zlen,:]
+Z = Z[0:zlen,:]
+U = U[0:zlen,:]
+
 U_new = flatten_wind_field(Z, U, alfa, Vref, href)
-U_squared, Y_squared, Z_squared, y_c, z_c = get_U_squared_no_z0(U_new, Y, Z)
+U_squared, Y_squared, Z_squared, y_c, z_c, flag_no_deficit = get_U_squared_no_z0(U_new, Y, Z)
 popt, perr, yz_arr, u_arr = gauss_interp_c(Y_squared, Z_squared, y_c, z_c, U_squared)
 
-print(popt)
+fig, ax = plt.subplots(1,1, subplot_kw={"projection": "3d"})
+
+surf = ax.plot_surface(Y, Z, U, cmap=cm.Spectral,
+                       linewidth=0, antialiased=False)
+
+ax.view_init(20, -70, vertical_axis='y')
+
+ax.set(xlabel='Lateral coordinate [m]',
+       ylabel='Vertical coordinate [m]',
+       zlabel='Wind speed [m/s]')
+
+fig.colorbar(surf)
+ax.title.set_text('Wind field downstream')
+plt.show()
+
+fig2, ax2 = plt.subplots(1,1, subplot_kw={"projection": "3d"})
+
+surf2 = ax2.plot_surface(Y, Z, U_new, cmap=cm.Spectral,
+                             linewidth=0, antialiased = False)
+
+ax2.view_init(20, -70, vertical_axis='y')
+
+ax2.set(xlabel='Lateral coordinate [m]',
+       ylabel='Vertical coordinate [m]',
+       zlabel='Wafe deficit [m/s]')
+
+fig2.colorbar(surf2)
+#ax2.title.set_text('Wind wake')
+plt.show()
 
 '''
 start_time = time.time()

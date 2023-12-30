@@ -250,7 +250,7 @@ offset_arr = np.array([-0.5, -0.25, 0, 0.25, 0.5])
 DD_arr = np.array([5]) #np.array([3, 4, 5, 6, 7])
 #TI_arr = np.array([0.02, 0.06, 0.1])
 yaw_arr = np.array([-25, -15, 0, 15, 25])
-Vm_arr = np.array([3, 5, 7, 9, 11, 13, 15])
+Vm_arr = np.array([4, 5, 7, 9, 11, 13, 15])
 der_arr = np.array([0, 2.5, 5, 10, 15])
 
 l_o = len(offset_arr)
@@ -396,7 +396,7 @@ for i_d, der in enumerate(der_arr):
 
 everything = pd.DataFrame(gauss_parameters, columns=['der', 'Vm', 'TI', 'yaw', 'DD', 'offset', 'peak', 'yc_d', 'zc_d', 'sigma', 'Vm', 'TI_QA', 'TI_ish', 'TI_TS', 'e_max', 'e_mean', 'e_stdv', 'e_rel_max', 'e_rel_mean', 'e_rel_stdv', 'y_shape', 'z_shape', 'CT'])
 
-filepath = Path('C:/Users/randr/Desktop/wake_5D.csv')
+filepath = Path('C:/Users/randr/Desktop/wake_5D_fixedTI.csv')
 
 
 '''
