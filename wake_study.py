@@ -13,7 +13,7 @@ from floris.tools.visualization import visualize_cut_plane
 import floris.tools.visualization as wakeviz
 from floris.tools.cut_plane import  get_plane_from_flow_data
 
-
+# a different header for git testing
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------Functions for gauss parameters calculation------------------------------------------
 def flatten_wind_field(Z, U, alfa, Vref, href):
