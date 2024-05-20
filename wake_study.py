@@ -5,7 +5,9 @@ import math
 from scipy.optimize import curve_fit
 from floris.tools import FlorisInterface
 
-# a different header for git testing
+
+#some header to test git
+#this is one of the main files
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------Functions for gauss parameters calculation------------------------------------------
 def flatten_wind_field(Z, U, alfa, Vref, href):
